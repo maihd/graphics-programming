@@ -1,0 +1,3 @@
+[submodule "c/vectormath"]
+	path = c/vectormath
+	url = https://github.com/maihd/vectormath
