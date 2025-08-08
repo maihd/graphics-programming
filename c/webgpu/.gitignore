@@ -2,4 +2,5 @@
 .vscode
 .DS_Store
 
+webgpu_demos
 webgpu_demos.exe

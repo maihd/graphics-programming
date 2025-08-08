@@ -1,3 +1,3 @@
 CompileFlags:
-    Add: -I../vectormath/include
+    Add: -I../vectormath/include -I3rd_party/wgpu-native/include
     Compiler: clang
