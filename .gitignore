@@ -1,3 +1,7 @@
+.vs
+.vscode
+.DS_Store
+
 a
 a.out
 a.exe
