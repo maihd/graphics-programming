@@ -6,5 +6,8 @@ a
 a.out
 a.exe
 
+build
+shaders-out
+
 /zig-out
 /zig-cache
