@@ -1,5 +1,4 @@
 #include <stdio.h>
-
 #define SDL_MAIN_USE_CALLBACKS
 
 #include <SDL3/SDL.h>
@@ -36,13 +35,15 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
     SDL_SetAppMetadata("SDL Hello World Example", "1.0", "com.example.sdl-hello-world");
 
+    // Initialize windows and graphics device context
+
     if (!SDL_Init(SDL_INIT_VIDEO)) 
     {
         SDL_Log("SDL_Init(SDL_INIT_VIDEO) failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
-    window = SDL_CreateWindow("Hello SDL", 640, 480, SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow("Hello SDL3 GPU", 640, 480, SDL_WINDOW_RESIZABLE);
     if (!window) 
     {
         SDL_Log("SDL_CreateWindowAndRenderer() failed: %s", SDL_GetError());
@@ -57,6 +58,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         SDL_Log("SDL_CreateGPUDevice() failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
+
+    // Create buffers
 
     SDL_GPUBufferCreateInfo bufferInfo = {
         .size = sizeof(vertices),
@@ -73,8 +76,15 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     Vertex* data = (Vertex*)SDL_MapGPUTransferBuffer(gpuDevice, transferBuffer, false);
     SDL_memcpy(data, vertices, sizeof(vertices));
 
+    data[0] = vertices[0];
+    data[1] = vertices[1];
+    data[2] = vertices[2];
+
+    SDL_UnmapGPUTransferBuffer(gpuDevice, transferBuffer);
+
     SDL_GPUCommandBuffer* commandBuffer = SDL_AcquireGPUCommandBuffer(gpuDevice);
     SDL_GPUCopyPass* copyPass = SDL_BeginGPUCopyPass(commandBuffer);
+
     SDL_GPUTransferBufferLocation location = {
         .transfer_buffer = transferBuffer,
         .offset = 0
@@ -86,16 +96,22 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     };
 
     SDL_UploadToGPUBuffer(copyPass, &location, &region, true);
+
     SDL_EndGPUCopyPass(copyPass);
+    SDL_SubmitGPUCommandBuffer(commandBuffer);
+
+    // Create shader and pipeline (like OpenGL Program)
 
     #if __APPLE__
     bool isMac = true;
+    #define SHADER_EXT ".msl"
     #else
     bool isMac = false;
+    #define SHADER_EXT ".spv"
     #endif
 
     size_t vertexCodeSize;
-    void* vertexCode = SDL_LoadFile("../../shaders-out/triangle-vert.msl", &vertexCodeSize);
+    void* vertexCode = SDL_LoadFile("../../shaders-out/triangle-vert" SHADER_EXT, &vertexCodeSize);
 
     SDL_GPUShaderCreateInfo vertexInfo = {
         .code = vertexCode,
@@ -111,14 +127,14 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     SDL_GPUShader* vertexShader = SDL_CreateGPUShader(gpuDevice, &vertexInfo);
     if (!vertexShader)
     {
-        SDL_Log("SDL_CreateGPUShader() failed: %s", SDL_GetError());
+        SDL_Log("SDL_CreateGPUShader() VertexShader failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
     SDL_free(vertexCode);
 
     size_t fragmentCodeSize;
-    void* fragmentCode = SDL_LoadFile("../../shaders-out/triangle-frag.msl", &fragmentCodeSize);
+    void* fragmentCode = SDL_LoadFile("../../shaders-out/triangle-frag" SHADER_EXT, &fragmentCodeSize);
 
     SDL_GPUShaderCreateInfo fragmentInfo = {
         .code = fragmentCode,
@@ -134,7 +150,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     SDL_GPUShader* fragmentShader = SDL_CreateGPUShader(gpuDevice, &fragmentInfo);
     if (!fragmentShader)
     {
-        SDL_Log("SDL_CreateGPUShader() failed: %s", SDL_GetError());
+        SDL_Log("SDL_CreateGPUShader() FragmentShader failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
@@ -145,7 +161,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
             .slot = 0,
             .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
             .instance_step_rate = 0,
-            .pitch = sizeof(vertices)
+            .pitch = sizeof(Vertex)
         }  
     };
 
@@ -204,6 +220,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
+    SDL_Log("SDL_AppQuit: cleaning all resources");
+
     SDL_ReleaseGPUGraphicsPipeline(gpuDevice, graphicsPipeline);
 
     SDL_ReleaseGPUTransferBuffer(gpuDevice, transferBuffer);
@@ -242,9 +260,14 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     SDL_GPUCommandBuffer* commandBuffer = SDL_AcquireGPUCommandBuffer(gpuDevice);
 
-    SDL_GPUTexture* swapchainTexture;
     Uint32 width, height;
+    SDL_GPUTexture* swapchainTexture;
     SDL_WaitAndAcquireGPUSwapchainTexture(commandBuffer, window, &swapchainTexture, &width, &height);
+    if (swapchainTexture == NULL)
+    {
+        SDL_SubmitGPUCommandBuffer(commandBuffer);
+        return SDL_APP_CONTINUE;
+    }
 
     SDL_GPUColorTargetInfo colorTargetInfo = {
         .clear_color = { 0.0f, 0.0f, 0.0f, 1.0f },
@@ -254,6 +277,11 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     };
 
     SDL_GPURenderPass* renderPass = SDL_BeginGPURenderPass(commandBuffer, &colorTargetInfo, 1, NULL);
+    if (renderPass == NULL)
+    {
+        SDL_SubmitGPUCommandBuffer(commandBuffer);
+        return SDL_APP_CONTINUE;
+    }
 
     SDL_BindGPUGraphicsPipeline(renderPass, graphicsPipeline);
 
@@ -273,6 +301,5 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     return SDL_APP_CONTINUE;
 }
-
 
 //! EOF
