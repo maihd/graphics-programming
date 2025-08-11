@@ -26,6 +26,11 @@ static Vertex vertices[] =
     {0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f}     // bottom right vertex
 };
 
+typedef struct Uniform
+{
+    float time;
+} Uniform;
+
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 {
     SDL_Log("Graphics Programming examples for SDL3 GPU (SDL3-Release-3.2.20)\n");
@@ -145,7 +150,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
         .num_samplers = 0,
         .num_storage_buffers = 0,
         .num_storage_textures = 0,
-        .num_uniform_buffers = 0,
+        .num_uniform_buffers = 1,
     };
     SDL_GPUShader* fragmentShader = SDL_CreateGPUShader(gpuDevice, &fragmentInfo);
     if (!fragmentShader)
@@ -292,6 +297,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         }
     };
     SDL_BindGPUVertexBuffers(renderPass, 0, bufferBindings, 1);
+
+    Uniform uniform = { .time = SDL_GetTicksNS() / 1e9f };
+    SDL_PushGPUFragmentUniformData(commandBuffer, 0, &uniform, sizeof(uniform));
 
     SDL_DrawGPUPrimitives(renderPass, 3, 1, 0, 0);
 
