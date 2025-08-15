@@ -161,51 +161,45 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
 
     SDL_free(fragmentCode);
 
-    SDL_GPUVertexBufferDescription vertexBufferDescriptions[1] = {
-        {
-            .slot = 0,
-            .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
-            .instance_step_rate = 0,
-            .pitch = sizeof(Vertex)
-        }  
-    };
-
-    SDL_GPUVertexAttribute vertexAttributes[2] = {
-        {
-            .buffer_slot = 0,
-            .location = 0,
-            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-            .offset = 0,
-        },
-
-        {
-            .buffer_slot = 0,
-            .location = 1,
-            .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
-            .offset = sizeof(float) * 3,
-        }
-    };
-
-    SDL_GPUColorTargetDescription colorTargetDescriptions[1] = {
-        {
-            .format = SDL_GetGPUSwapchainTextureFormat(gpuDevice, window)
-        }
-    };
-
     SDL_GPUGraphicsPipelineCreateInfo pipelineInfo = {
         .vertex_shader = vertexShader,
         .fragment_shader = fragmentShader,
         .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
         .vertex_input_state = {
             .num_vertex_buffers = 1,
-            .vertex_buffer_descriptions = vertexBufferDescriptions,
+            .vertex_buffer_descriptions = (SDL_GPUVertexBufferDescription[]){
+                {
+                    .slot = 0,
+                    .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
+                    .instance_step_rate = 0,
+                    .pitch = sizeof(Vertex)
+                }
+            },
 
             .num_vertex_attributes = 2,
-            .vertex_attributes = vertexAttributes,
+            .vertex_attributes = (SDL_GPUVertexAttribute[]){
+                {
+                    .buffer_slot = 0,
+                    .location = 0,
+                    .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
+                    .offset = 0
+                },
+                
+                {
+                    .buffer_slot = 0,
+                    .location = 1,
+                    .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
+                    .offset = sizeof(float) * 3
+                }
+            },
         },
         .target_info = {
             .num_color_targets = 1,
-            .color_target_descriptions = colorTargetDescriptions
+            .color_target_descriptions = (SDL_GPUColorTargetDescription[]){
+                {
+                    .format = SDL_GetGPUSwapchainTextureFormat(gpuDevice, window)
+                }
+            }
         }
     };
 
@@ -275,7 +269,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     }
 
     SDL_GPUColorTargetInfo colorTargetInfo = {
-        .clear_color = { 0.0f, 0.0f, 0.0f, 1.0f },
+        .clear_color = (SDL_FColor){ 0.0f, 0.0f, 0.0f, 1.0f },
         .load_op = SDL_GPU_LOADOP_CLEAR,
         .store_op = SDL_GPU_STOREOP_STORE,
         .texture = swapchainTexture
