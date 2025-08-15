@@ -3,4 +3,4 @@
 ## Why?
 - SDL3 is amazing upgrade for graphics/game
 - I need a window management for other graphics program
-- Will use SDL3 GPU for Mai Lite Editor
+- Will use SDL3 GPU for Mai Lite Editor?
