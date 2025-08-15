@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3_shadercross/SDL_shadercross.h>
 
 static SDL_Window* window = NULL;
 static SDL_GPUDevice* gpuDevice = NULL;
@@ -114,28 +115,56 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     bool isMac = false;
     #define SHADER_EXT ".spv"
     #endif
+    
+    if (!SDL_ShaderCross_Init())
+    {
+        SDL_Log("SDL_ShaderCross_Init() failed: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
 
     size_t vertexCodeSize;
-    void* vertexCode = SDL_LoadFile("../../shaders-out/triangle-vert" SHADER_EXT, &vertexCodeSize);
+    void* vertexCode = SDL_LoadFile("../../shaders-out/triangle-vert.spv", &vertexCodeSize);
 
-    SDL_GPUShaderCreateInfo vertexInfo = {
-        .code = vertexCode,
-        .code_size = vertexCodeSize,
-        .entrypoint = isMac ? "main0" : "main",
-        .format = isMac ? SDL_GPU_SHADERFORMAT_MSL : SDL_GPU_SHADERFORMAT_SPIRV,
-        .stage = SDL_GPU_SHADERSTAGE_VERTEX,
-        .num_samplers = 0,
-        .num_storage_buffers = 0,
-        .num_storage_textures = 0,
-        .num_uniform_buffers = 0,
+    // SDL_GPUShaderCreateInfo vertexInfo = {
+    //     .code = vertexCode,
+    //     .code_size = vertexCodeSize,
+    //     .entrypoint = isMac ? "main0" : "main",
+    //     .format = isMac ? SDL_GPU_SHADERFORMAT_MSL : SDL_GPU_SHADERFORMAT_SPIRV,
+    //     .stage = SDL_GPU_SHADERSTAGE_VERTEX,
+    //     .num_samplers = 0,
+    //     .num_storage_buffers = 0,
+    //     .num_storage_textures = 0,
+    //     .num_uniform_buffers = 0,
+    // };
+    // SDL_GPUShader* vertexShader = SDL_CreateGPUShader(gpuDevice, &vertexInfo);
+    SDL_ShaderCross_SPIRV_Info vertexShaderInfo = {
+        .bytecode = vertexCode,
+        .bytecode_size = vertexCodeSize,
+        .entrypoint = "main",
+        .shader_stage = SDL_SHADERCROSS_SHADERSTAGE_VERTEX,
+        .enable_debug = false,
+        .name = NULL,
+        .props = 0
     };
-    SDL_GPUShader* vertexShader = SDL_CreateGPUShader(gpuDevice, &vertexInfo);
+    SDL_ShaderCross_GraphicsShaderMetadata* vertexMetadata = SDL_ShaderCross_ReflectGraphicsSPIRV(vertexCode, vertexCodeSize, 0);
+    SDL_GPUShader* vertexShader = SDL_ShaderCross_CompileGraphicsShaderFromSPIRV(
+        gpuDevice, 
+        &vertexShaderInfo,
+        vertexMetadata,
+        0
+    );
+    // SDL_GPUShader* vertexShader = SDL_ShaderCross_CompileGraphicsShaderFromHLSL(
+
+    // );
+
+
     if (!vertexShader)
     {
         SDL_Log("SDL_CreateGPUShader() VertexShader failed: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
+    SDL_free(vertexMetadata);
     SDL_free(vertexCode);
 
     size_t fragmentCodeSize;
@@ -225,6 +254,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
     SDL_ReleaseGPUTransferBuffer(gpuDevice, transferBuffer);
     SDL_ReleaseGPUBuffer(gpuDevice, vertexBuffer);
+
+    SDL_ShaderCross_Quit();
 
     SDL_DestroyGPUDevice(gpuDevice);
     SDL_DestroyWindow(window);

@@ -30,5 +30,15 @@ elif [ "$OSNAME" == "Darwin" ]; then
 fi
 
 SDL3_FOLDER="../SDL-release-3.2.20"
+SDL3_SHADERCROSS_FOLDER="../SDL_shadercross"
 
-clang main.c -I$SDL3_FOLDER/include $SDL3_FOLDER/$PREBUILT_FOLDER/libSDL3.a $OSDEPS
+clang main.c $OSDEPS                                                \
+    -I$SDL3_FOLDER/include                                          \
+    $SDL3_FOLDER/$PREBUILT_FOLDER/libSDL3.a                         \
+    -I$SDL3_SHADERCROSS_FOLDER/include                              \
+    -L$SDL3_SHADERCROSS_FOLDER/$PREBUILT_FOLDER                     \
+    -lSDL3_shadercross                                              \
+    -lspirv-cross-core -lspirv-cross-c  -lspirv-cross-cpp           \
+    -lspirv-cross-msl -lspirv-cross-hlsl -lspirv-cross-glsl         \
+    -lspirv-cross-reflect -lspirv-cross-util                        \
+    -lstdc++
