@@ -1,5 +1,6 @@
 package sdl3_gpu_sample
 
+import shadercross "../sdl_shadercross"
 import "core:fmt"
 import sdl "vendor:sdl3"
 
