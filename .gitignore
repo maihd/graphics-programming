@@ -11,3 +11,7 @@ shaders-out
 
 /zig-out
 /zig-cache
+
+*.exe
+*.pdb
+*.rdi
