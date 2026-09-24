@@ -6,20 +6,20 @@ struct Input
 
 struct Output
 {
-	float2 UV : TEXCOORD0;
 	float4 Position : SV_Position;
+	float2 UV : TEXCOORD0;
 };
 
 cbuffer UniformBlock : register(b0, space1) 
 {
-	float4x4 mvp : packoffset(c0);
+	column_major float4x4 mvp : packoffset(c0);
 };
 
 Output main(Input input)
 {
 	Output output;
+	output.Position = mul(mvp, float4(input.Position, 1.0));
 	output.UV = input.UV;
-	output.Position = mul(mvp, float4(input.Position, 1.0f));
 
 	return output;
 }

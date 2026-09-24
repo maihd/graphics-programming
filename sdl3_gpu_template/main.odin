@@ -6,6 +6,7 @@ import "core:image/png"
 import "core:strings"
 
 import glm "core:math/linalg/glsl"
+import linalg "core:math/linalg"
 
 import sdl "vendor:sdl3"
 import shadercross "libs/sdl_shadercross"
@@ -15,8 +16,8 @@ import tinyobj "libs/tinyobj"
 frag_src_hlsl :: #load(#directory + "assets/shaders/frag.hlsl")
 vert_src_hlsl :: #load(#directory + "assets/shaders/vert.hlsl")
 
-MODEL :: #load(#directory + "assets/models/viking_room.obj")
-TEXTURE_IMG_DATA :: #load(#directory + "assets/models/viking_room.png")
+MODEL :: #load(#directory + "assets/models/space-shuttle.obj")
+TEXTURE_IMG_DATA :: #load(#directory + "assets/models/ShuttleDiffuseMap.png")
 
 Vertex :: struct {
 	pos: [3]f32,
@@ -27,6 +28,9 @@ UniformBufferObject :: struct {
 	mvp: glm.mat4,
 }
 
+SCREEN_WIDTH :: 800
+SCREEN_HEIGHT :: 600
+
 main :: proc() {
 	fmt.printf("Odin GPU Programming\n")
 
@@ -35,15 +39,26 @@ main :: proc() {
 	}
 	defer sdl.Quit()
 
-	window := sdl.CreateWindow("Odin GPU Programming", 800, 600, {})
+	window := sdl.CreateWindow("Odin GPU Programming", SCREEN_WIDTH, SCREEN_HEIGHT, {})
 	defer sdl.DestroyWindow(window)
 
-	gpu_device := sdl.CreateGPUDevice({.SPIRV}, false, nil)
+	gpu_device := sdl.CreateGPUDevice({.SPIRV}, true, nil)
 	defer sdl.DestroyGPUDevice(gpu_device)
 
 	if !sdl.ClaimWindowForGPUDevice(gpu_device, window) {
 		fmt.panicf("Failed to claim window for gpu_device: %s\n", sdl.GetError())
 	}
+	defer sdl.ReleaseWindowFromGPUDevice(gpu_device, window)
+
+	fmt.printfln("GPU Driver: %s", sdl.GetGPUDeviceDriver(gpu_device))
+	fmt.printfln(
+		"GPU Driver Version: %s",
+		sdl.GetStringProperty(
+			sdl.GetGPUDeviceProperties(gpu_device),
+			sdl.PROP_GPU_DEVICE_DRIVER_VERSION_STRING,
+			"<unknown>",
+		),
+	)
 
 	if !shadercross.Init() {
 		fmt.panicf("Failed to init shadercross")
@@ -77,8 +92,8 @@ main :: proc() {
 				vertex := Vertex {
 					pos = {
 						model.attrib.vertices[idx.v_idx * 3 + 0],
-						model.attrib.vertices[idx.v_idx * 3 + 2],
 						model.attrib.vertices[idx.v_idx * 3 + 1],
+						model.attrib.vertices[idx.v_idx * 3 + 2],
 					},
 					uv  = {
 						model.attrib.texcoords[idx.vt_idx * 2 + 0],
@@ -92,6 +107,7 @@ main :: proc() {
 				}
 
 				append(&indices, unique_vertices[vertex])
+				// append(&vertices, vertex)
 			}
 
 			index_offset += num_verts
@@ -198,12 +214,14 @@ main :: proc() {
 	})
 
 	sampler := sdl.CreateGPUSampler(gpu_device, {
-		min_filter     = .NEAREST,
-		mag_filter     = .NEAREST,
-		mipmap_mode    = .NEAREST,
-		address_mode_u = .CLAMP_TO_EDGE,
-		address_mode_v = .CLAMP_TO_EDGE,
-		address_mode_w = .CLAMP_TO_EDGE,
+		min_filter     = .LINEAR,
+		mag_filter     = .LINEAR,
+		mipmap_mode    = .LINEAR,
+		address_mode_u = .REPEAT,
+		address_mode_v = .REPEAT,
+		address_mode_w = .REPEAT,
+		min_lod        = 0,
+		max_lod        = 1000.0,
 	})
 
 	{
@@ -279,20 +297,53 @@ main :: proc() {
 		num_uniform_buffers  = 0,
 	})
 
-	pipeline := sdl.CreateGPUGraphicsPipeline(
-	gpu_device,
-	{
+	DEPTH_TEXTURE_FORMAT: sdl.GPUTextureFormat
+	if sdl.GPUTextureSupportsFormat(gpu_device, .D24_UNORM_S8_UINT, .D2, {.DEPTH_STENCIL_TARGET}) {
+		DEPTH_TEXTURE_FORMAT = .D24_UNORM_S8_UINT
+	} else if sdl.GPUTextureSupportsFormat(
+		gpu_device,
+		.D32_FLOAT_S8_UINT,
+		.D2,
+		{.DEPTH_STENCIL_TARGET},
+	) {
+		DEPTH_TEXTURE_FORMAT = .D32_FLOAT_S8_UINT
+	} else {
+		DEPTH_TEXTURE_FORMAT = .D16_UNORM // Lowest common denominator
+	}
+	fmt.printfln("Selected depth texture format: %v", DEPTH_TEXTURE_FORMAT)
+
+	default_stencil_op_state := sdl.GPUStencilOpState {
+		fail_op       = .KEEP,
+		pass_op       = .KEEP,
+		depth_fail_op = .KEEP,
+		compare_op    = .ALWAYS,
+	}
+	// default_stencil_op_state := sdl.GPUStencilOpState{}
+
+	pipeline := sdl.CreateGPUGraphicsPipeline(gpu_device, {
 		multisample_state = {
-			enable_alpha_to_coverage = true,
+			enable_alpha_to_coverage = false,
 			enable_mask              = false,
-			sample_count             = ._1,
+			sample_count             = ._8,
 			sample_mask              = 0,
 		},
 		vertex_shader = vert_shader,
 		fragment_shader = frag_shader,
 		primitive_type = .TRIANGLELIST,
 		rasterizer_state = {
-			fill_mode = .FILL,
+			cull_mode  = .BACK,
+			fill_mode  = .FILL,
+			front_face = .COUNTER_CLOCKWISE,
+		},
+		depth_stencil_state = {
+			enable_depth_test   = true,
+			enable_depth_write  = true,
+			compare_op          = .LESS_OR_EQUAL,
+			write_mask          = 0xff,
+			compare_mask        = 0xff,
+			enable_stencil_test = true,
+			back_stencil_state  = default_stencil_op_state,
+			front_stencil_state = default_stencil_op_state,
 		},
 		target_info = {
 			num_color_targets         = 1,
@@ -309,13 +360,7 @@ main :: proc() {
 				},
 			},
 			has_depth_stencil_target  = true,
-			depth_stencil_format      = .D24_UNORM_S8_UINT,
-		},
-		depth_stencil_state = {
-			compare_op         = .LESS,
-			enable_depth_test  = true,
-			enable_depth_write = true,
-			// enable_stencil_test = true,
+			depth_stencil_format      = DEPTH_TEXTURE_FORMAT,
 		},
 		vertex_input_state = {
 			num_vertex_buffers         = 1,
@@ -341,16 +386,49 @@ main :: proc() {
 				},
 			}),
 		},
-	},
-	)
+	})
 	defer sdl.ReleaseGPUGraphicsPipeline(gpu_device, pipeline)
 
 	sdl.ReleaseGPUShader(gpu_device, vert_shader)
 	sdl.ReleaseGPUShader(gpu_device, frag_shader)
 
+	msaa_texture := sdl.CreateGPUTexture(gpu_device, {
+		type                 = .D2,
+		width                = SCREEN_WIDTH,
+		height               = SCREEN_HEIGHT,
+		layer_count_or_depth = 1,
+		num_levels           = 1,
+		format               = sdl.GetGPUSwapchainTextureFormat(gpu_device, window),
+		sample_count         = ._8,
+		usage                = {.COLOR_TARGET},
+	})
+	defer sdl.ReleaseGPUTexture(gpu_device, msaa_texture)
+
+	resolve_texture := sdl.CreateGPUTexture(gpu_device, {
+		type                 = .D2,
+		width                = SCREEN_WIDTH,
+		height               = SCREEN_HEIGHT,
+		layer_count_or_depth = 1,
+		num_levels           = 1,
+		format               = sdl.GetGPUSwapchainTextureFormat(gpu_device, window),
+		usage                = {.SAMPLER, .COLOR_TARGET},
+	})
+	defer sdl.ReleaseGPUTexture(gpu_device, resolve_texture)
+
+	depth_texture := sdl.CreateGPUTexture(gpu_device, {
+		type                 = .D2,
+		width                = SCREEN_WIDTH,
+		height               = SCREEN_HEIGHT,
+		layer_count_or_depth = 1,
+		num_levels           = 1,
+		format               = DEPTH_TEXTURE_FORMAT,
+		sample_count         = ._8,
+		usage                = {.DEPTH_STENCIL_TARGET},
+	})
+
 	camera :=
-		glm.mat4Perspective(90, 800.0 / 600.0, -100, 100) *
-		glm.mat4LookAt({10, 10, 10}, {0, 0, 0}, {0, 1, 0})
+		glm.mat4Perspective(90 * math.RAD_PER_DEG, 800.0 / 600.0, 0.1, 100) *
+		glm.mat4LookAt({20, 20, 20}, {0, 0, 0}, {0, 1, 0})
 	model_mat := glm.mat4Translate({0, 0, 0}) * glm.mat4Scale({10, 10, 10})
 
 	uniform := UniformBufferObject {
@@ -366,13 +444,13 @@ main :: proc() {
 		}
 
 		model_mat =
-			glm.mat4Translate({400, 300, 0}) *
+			glm.mat4Translate({0, 0, 0}) *
 			glm.mat4Rotate(
-				{0, 0, 1},
+				{0, 1, 0},
 				f32(f64(sdl.GetPerformanceCounter()) / f64(sdl.GetPerformanceFrequency())),
 			) *
-			glm.mat4Scale({100, 100, 1})
-		// uniform.mvp = camera * model_mat
+			glm.mat4Scale({1, 1, 1})
+		uniform.mvp = camera * model_mat
 
 		cmdbuf := sdl.AcquireGPUCommandBuffer(gpu_device)
 		if cmdbuf == nil {
@@ -391,13 +469,32 @@ main :: proc() {
 		if !swapchain_ok {
 			fmt.panicf("Failed to acquire swapchain: %s\n", sdl.GetError())
 		}
+		if swapchain_texture == nil {
+			fmt.printfln("Swapchain is nil: %s", sdl.GetError())
+			continue
+		}
+
+		target_depth_info := &sdl.GPUDepthStencilTargetInfo {
+			texture          = depth_texture,
+			cycle            = true,
+			clear_depth      = 1.0,
+			clear_stencil    = 1.0,
+			load_op          = .CLEAR,
+			store_op         = .DONT_CARE,
+			stencil_load_op  = .CLEAR,
+			stencil_store_op = .DONT_CARE,
+		}
 
 		render_pass := sdl.BeginGPURenderPass(cmdbuf, &sdl.GPUColorTargetInfo {
-				load_op     = .CLEAR,
-				store_op    = .DONT_CARE,
-				clear_color = {0, 0, 0, 1},
-				texture     = swapchain_texture,
-			}, 1, nil)
+				load_op         = .CLEAR,
+				store_op        = .RESOLVE,
+				clear_color     = {0.2, 0.3, 0.4, 1},
+				texture         = msaa_texture,
+				resolve_texture = resolve_texture,
+			}, 1, target_depth_info)
+		if render_pass == nil {
+			fmt.panicf("Failed to begin render pass. Error: %s", sdl.GetError())
+		}
 
 		sdl.BindGPUGraphicsPipeline(render_pass, pipeline)
 
@@ -419,6 +516,23 @@ main :: proc() {
 		sdl.DrawGPUIndexedPrimitives(render_pass, u32(len(indices)), 1, 0, 0, 0)
 
 		sdl.EndGPURenderPass(render_pass)
+
+		blit_texture_source := resolve_texture
+		sdl.BlitGPUTexture(cmdbuf, {
+			source = {
+				texture = blit_texture_source,
+				x       = 0,
+				w       = SCREEN_WIDTH,
+				h       = SCREEN_HEIGHT,
+			},
+			destination = {
+				texture = swapchain_texture,
+				w       = swapchain_width,
+				h       = swapchain_height,
+			},
+			load_op = .DONT_CARE,
+			filter = .LINEAR,
+		})
 
 		if !sdl.SubmitGPUCommandBuffer(cmdbuf) {
 			fmt.panicf("Failed to submit command buffer: %s\n", sdl.GetError())
