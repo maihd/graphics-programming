@@ -6,8 +6,8 @@ import "core:strings"
 import shadercross "../gfx/sdl3_shadercross"
 import sdl "vendor:sdl3"
 
-VERT_SRC :: #load(#directory + "vert.hlsl")
-FRAG_SRC :: #load(#directory + "frag.hlsl")
+VERT_SRC :: #load(#directory + "../assets/shaders/raw_triangle.vert.hlsl")
+FRAG_SRC :: #load(#directory + "../assets/shaders/solid_color.frag.hlsl")
 
 create_shader :: proc(
 	gpu_device: ^sdl.GPUDevice,

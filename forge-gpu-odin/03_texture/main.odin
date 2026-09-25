@@ -67,8 +67,8 @@ main :: proc() {
 
 	log.infof("Create shaders & pipeline")
 
-	vert_shader := load_shader(gpu_device, "texture.vert.hlsl", .VERTEX, "main")
-	frag_shader := load_shader(gpu_device, "texture.frag.hlsl", .FRAGMENT, "main")
+	vert_shader := load_shader(gpu_device, "sprite.vert.hlsl", .VERTEX, "main")
+	frag_shader := load_shader(gpu_device, "sprite.frag.hlsl", .FRAGMENT, "main")
 
 	pipeline := sdl.CreateGPUGraphicsPipeline(
 		gpu_device,
@@ -181,7 +181,10 @@ main :: proc() {
 
 	log.infof("Create texture & sampler")
 
-	teximg, err := png.load_from_file(#directory + "sdl.png", {.alpha_add_if_missing})
+	teximg, err := png.load_from_file(
+		#directory + "../assets/sprites/sdl.png",
+		{.alpha_add_if_missing},
+	)
 	if err != nil {
 		log.panicf("Failed to load image from %s. Error: %v", #directory + "sdl.png", err)
 	}
@@ -322,7 +325,7 @@ load_shader :: proc(
 	stage: shadercross.ShaderStage,
 	entry_point: string,
 ) -> ^sdl.GPUShader {
-	full_path := strings.join({#directory, filename}, "/")
+	full_path := strings.join({#directory, "..", "assets", "shaders", filename}, "/")
 	defer delete(full_path)
 
 	file_data, err := os.read_entire_file(full_path, allocator = context.allocator)

@@ -216,7 +216,7 @@ load_shader :: proc(
 	stage: shadercross.ShaderStage,
 	entry_point: string,
 ) -> ^sdl.GPUShader {
-	full_path := strings.join({#directory, filename}, "/")
+	full_path := strings.join({#directory, "..", "assets", "shaders", filename}, "/")
 	defer delete(full_path)
 
 	file_data, err := os.read_entire_file(full_path, context.allocator)
