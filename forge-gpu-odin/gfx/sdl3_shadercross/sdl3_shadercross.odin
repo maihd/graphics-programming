@@ -62,7 +62,7 @@ ShaderStage :: enum c.int {
 IOVarMetadata :: struct {
 	name:        cstring, /**< The UTF-8 name of the variable. */
 	location:    Uint32, /**< The location of the variable. */
-	ector_type:  IOVarType, /**< The vector type of the variable. */
+	vector_type: IOVarType, /**< The vector type of the variable. */
 	vector_size: Uint32, /**< The number of components in the vector type of the variable. */
 }
 
