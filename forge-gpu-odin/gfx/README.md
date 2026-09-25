@@ -32,6 +32,7 @@ Thoses things are required to written by hand. Specially for learning purpose.
 - Time (core:time)
 - Math (core:math/linalg/glsl)
 - Format (core:fmt)
+- Logger (core:log)
 - Image (core:image)
 - Memory allocator (core:mem, core:mem/virtual)
 - Cmdline arguments (core:flags)
