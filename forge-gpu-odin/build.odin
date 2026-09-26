@@ -75,7 +75,7 @@ run_example :: proc(example_path: string, odin_exe := ODIN_EXE_DEFAULT) {
 
 	p, err := os.process_start(
 		{
-			command = {odin_exe, "build", example_path, output_option},
+			command = {odin_exe, "build", example_path, output_option, "-debug"},
 			stdout = os.stdout,
 			stderr = os.stderr,
 		},
